@@ -1,16 +1,35 @@
+/*
+Authors : Anuradha A.K. & Kannangara N.V.
+Date : September 3, 2023
+Description : Flower Exchange Project. There are five flowers and program takes
+              csv file that includes the orders. The algorithm of the code makes
+              the execution sequance of the orders and finally build the output
+              csv file.
+*/
+
+/* NOTE : The slide set initially specifies that the minimum acceptable quantity is 10, 
+          and it also indicates that orders with a quantity of up to 1000 are acceptable. 
+          However, there seems to be an inconsistency, as later in the slides, there is an 
+          example of a rejected order with a quantity of 1000. But now, I have assumed 
+          that the minimum is 10 and maximum is 1000.
+*/
+// TODO: Change this according to the rules
+#define MINIMUM_ALLOWABLE_QUANTITY 10
+#define MAXIMUM_ALLOWABLE_QUANTITY 1000
+
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <sstream>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <thread>
 #include <queue>
 #include <mutex>
 #include <chrono>
 #include <ctime>
 #include <iomanip>
-#include <sstream>
 #include <algorithm>
 
 using namespace std;
@@ -29,11 +48,11 @@ public:
     string exec_status; // New, Fill, PFill, Reject
     string timestamp;
     string reason; // reason for reject
-    string order_flow; // use for make the correct ordering
+    double order_flow; // use for make the correct ordering
 
     // Constructor
     Order(vector<string>& row) {
-        order_flow = row[0];
+        order_flow = stod(row[0]);
         customer_id = row[1];
         instrument = row[2];
         side = row[3];
@@ -56,7 +75,7 @@ public:
 //---------------------------FUNCTION FOR PRIORITY QUEUE----------------------------------------------------
 struct CompareVectors {
     bool operator()(const Order& a, const Order& b) const {
-        return stof(a.order_flow) > stof(b.order_flow);  // greater-than comparison for min-heap behavior
+        return a.order_flow > b.order_flow;  // greater-than comparison for min-heap behavior
     }
 };
 
@@ -191,7 +210,7 @@ public:
 
         // adds the header row first
         vector<string> trade_arr = {"Order ID", "Client Order ID", "Instrument", "Side", 
-                                        "Exec Status", "Quantity", "Price", "Transaction Time", "Reason"}; // header
+                                        "Exec Status", "Quantity", "Price", "Reason", "Transaction Time"}; // header
         for (size_t i = 0; i < trade_arr.size(); ++i) {
             outputFile << trade_arr[i];
             if (i < trade_arr.size() - 1) {
@@ -212,8 +231,8 @@ public:
                     << top_order.exec_status << ","
                     << top_order.quantity << ","
                     << top_order.price << ","
-                    << top_order.timestamp << ","
-                    << top_order.reason << ","<< endl;
+                    << top_order.reason << ","
+                    << top_order.timestamp << ","<< endl;
         }
 
         // Close the output file
@@ -224,54 +243,51 @@ public:
 
 private:
     string filename;
+    unordered_set<string> unique_customer_ids;
 
     //----------------------------------- CLASSIFY THE ORDERS AND ADDS THE REASON -----------------------------------------------------
     void classifyOrders(unordered_map<string, vector<Order>>& order_map, Order &order, int error_code) {
         string flowerName = order.instrument;
         if (error_code == 200) { // if everything OK
-            order.reason = "";
+            order.reason = "NA";
             order.addToMap(order_map, flowerName);
         }
         else { // error occured
-            if (error_code == 400) {
-                order.reason = "Missing field";
-            }
-            else if (error_code == 401) {
-                order.reason = "Invalid instrument";
-            }
-            else if (error_code == 402) {
-                order.reason = "Invalid side";
-            }
-            else if (error_code == 403) {
-                order.reason = "Invalid quantity";
-            }
-            else if (error_code == 404) {
-                order.reason = "Invalid price";
-            }
+            if (error_code == 400) order.reason = "Missing field";
+            else if (error_code == 401) order.reason = "Invalid instrument";
+            else if (error_code == 402) order.reason = "Invalid side";
+            else if (error_code == 403) order.reason = "Invalid quantity";
+            else if (error_code == 404) order.reason = "Invalid price";
+            else if (error_code == 405) order.reason = "duplicate customer id";
             order.exec_status = "Reject";
             order.addToMap(order_map, "Rejected");
         }
     }
 
     //----------------------------------- CHECK THE REQUIREMENTS OF A ORDER -----------------------------------------------------
+    /* Description of the Rules: 
+        1. Can not be empty mandatory fields
+        2. Instruments Only flower names with first letter CAPITAL.
+        3. Side should be 1 or 2.
+        4. Price can not be negetive. Yes, I know everyone know this. ;)
+        5. Quantity should be multiple of 10 and between 10 and 1000.
+        6. Customer id should be unique.
+    */
     int isRejected(string field, int column_number) {
         float price;
         int quantity;
 
         // Check if any required field is missing
-        if (field.empty()) {
-            return 400;
-        }
+        if (field.empty()) return 400;
 
-        if (column_number == 1) { // instrument column
-            if (field != "Rose" && field != "Lavender" && field != "Lotus" && field != "Tulip" && field != "Orchid") {
-                return 401;
-            }
+        if (column_number == 0) { // customer id column (it should be unique)
+            if (!unique_customer_ids.insert(field).second) return 405;
+        }
+        else if (column_number == 1) { // instrument column
+            if (field != "Rose" && field != "Lavender" && field != "Lotus" && field != "Tulip" && field != "Orchid") return 401;
         }
         else if (column_number == 2) { // buy sell column
-            if (field != "1" && field != "2") {
-                return 402;
-            }
+            if (field != "1" && field != "2") return 402;
         }
         else if (column_number == 3) { // quantity column
             try {
@@ -279,9 +295,7 @@ private:
             } catch (...) {
                 return 403;
             }
-            if (quantity % 10 != 0 || quantity >= 1000 || quantity <= 10) {
-                return 403;
-            }
+            if (quantity % 10 != 0 || quantity > MAXIMUM_ALLOWABLE_QUANTITY || quantity < MINIMUM_ALLOWABLE_QUANTITY) return 403;
         }
         else if (column_number == 4) { // price column
             try {
@@ -289,9 +303,7 @@ private:
             } catch (...) {
                 return 404;
             }
-            if (price <= 0.0) {
-                return 404;
-            }
+            if (price <= 0.0) return 404;
         }
 
         return 200; // if everything OK
@@ -308,16 +320,12 @@ public:
     unordered_map<string, vector<Order>> order_map;
 
     //----------------------------------- INSERT A ORDER TO THE PRIORITY QUEUE----------------------------------
-    void insertTradeHeap(Order order, string exec_status, string order_flow, string timestamp) {
+    void insertTradeHeap(Order order, string exec_status, double order_flow, string timestamp) {
         lock_guard<mutex> lock(mtx); // lock the thread until one thread is done
         order.exec_status = exec_status;
         order.timestamp = timestamp;
         order.order_flow = order_flow;
         
-        // rejected orders already has a reason
-        if (exec_status != "Reject") { 
-            order.reason = ""; // reason
-        }
         this->trade_queue.push(order);
         return;
     }
@@ -337,7 +345,7 @@ public:
             
             // making the order id
             string order_id = "ord";
-            order_id.append(order.order_flow);
+            order_id.append(to_string(static_cast<int>(order.order_flow)));
             order.order_id = order_id;
 
             if (order.isBuy()) { // buy order
@@ -364,7 +372,7 @@ public:
             
             // making the order id
             string order_id = "ord";
-            order_id.append(order.order_flow);
+            order_id.append(to_string(static_cast<int>(order.order_flow)));
             order.order_id = order_id;
 
             timestamp = getCurrentTimestamp();
@@ -377,9 +385,10 @@ private:
     void processBuyOrders(OrderBook& order_book, Order& order) {
         vector<Order>* sell_book = &order_book.sell_orders;
         string timestamp;
-        float incrementor = 0.0001; // for make the correct ordering (if one order makes multiple trades, then the order flow number
+        double incrementor = 0.0001; // for make the correct ordering (if one order makes multiple trades, then the order flow number
                                         // should be increment) 0.0001 is enough bcoz maximum quantity is 1000.
-        
+        double old_order_flow = order.order_flow;
+
         if (sell_book->size() == 0) { // there are nothing to sell
             timestamp = getCurrentTimestamp();
             this->insertTradeHeap(order, "New", order.order_flow, timestamp);
@@ -407,11 +416,11 @@ private:
                         (*sell_book)[0].quantity = to_string(buy_quantity); // set the transaction quantity
                         timestamp = getCurrentTimestamp();
                         this->insertTradeHeap(order, "Fill", order.order_flow, timestamp);
-                        order.order_flow = to_string(stof(order.order_flow) + incrementor); // increment the order flow number for next row of the same order
+                        order.order_flow = order.order_flow + incrementor; // increment the order flow number for next row of the same order
                         order.quantity = "0"; // set the quantity to zero in order
                         timestamp = getCurrentTimestamp();
                         this->insertTradeHeap((*sell_book)[0], "PFill", order.order_flow, timestamp);
-                        order.order_flow = to_string(stof(order.order_flow) + incrementor); // increment the order flow number for next row of the same order
+                        order.order_flow = order.order_flow + incrementor; // increment the order flow number for next row of the same order
                         (*sell_book)[0].quantity = to_string(sell_quantity - buy_quantity); // remaining quantity adds to the order book
                         break;
 
@@ -419,27 +428,28 @@ private:
                         order.quantity = to_string(sell_quantity); // set the transaction quantity
                         timestamp = getCurrentTimestamp();
                         this->insertTradeHeap(order, "PFill",order.order_flow, timestamp);
-                        order.order_flow = to_string(stof(order.order_flow) + incrementor); // increment the order flow number for next row of the same order
+                        order.order_flow = order.order_flow + incrementor; // increment the order flow number for next row of the same order
                         order.price = row_price; // set the price to the original price for remaining items
                         order.quantity = to_string(buy_quantity - sell_quantity); // remaining quantity adds to the order book 
                         timestamp = getCurrentTimestamp();
                         this->insertTradeHeap((*sell_book)[0], "Fill", order.order_flow, timestamp);
-                        order.order_flow = to_string(stof(order.order_flow) + incrementor); // increment the order flow number for next row of the same order
+                        order.order_flow = order.order_flow + incrementor; // increment the order flow number for next row of the same order
                         sell_book->erase(sell_book->begin()); // remove the completed order from the order book
 
                     } else { // sell quantity is equal to buy quantity
                         timestamp = getCurrentTimestamp();
                         this->insertTradeHeap(order, "Fill", order.order_flow, timestamp);
-                        order.order_flow = to_string(stof(order.order_flow) + incrementor); // increment the order flow number for next row of the same order
+                        order.order_flow = order.order_flow + incrementor; // increment the order flow number for next row of the same order
                         timestamp = getCurrentTimestamp();
                         this->insertTradeHeap((*sell_book)[0], "Fill", order.order_flow, timestamp);
-                        order.order_flow = to_string(stof(order.order_flow) + incrementor);
+                        order.order_flow = order.order_flow + incrementor;
                         sell_book->erase(sell_book->begin()); // remove the completed order from the order book
                         order.quantity = "0"; //order completed, quantity is zero
                         break;
                     }
                 }
-            } 
+            }
+            order.order_flow = old_order_flow;
         }
     }
 
@@ -447,13 +457,15 @@ private:
     void processSellOrders(OrderBook& order_book, Order& order) {
         vector<Order>* buy_book = &order_book.buy_orders;
         string timestamp;
-        float incrementor = 0.0001; // for make the correct ordering (if one order makes multiple trades, then the order flow number 
+        double incrementor = 0.0001; // for make the correct ordering (if one order makes multiple trades, then the order flow number 
                                         // should be increment) 0.0001 is enough bcoz maximum quantity is 1000.
+        double old_order_flow = order.order_flow;
+
         if (buy_book->size() == 0) { // there are nothing to buy
             timestamp = getCurrentTimestamp();
             this->insertTradeHeap(order, "New", order.order_flow, timestamp);
         } else {
-            if ((*buy_book)[0].price < order.price) { // buy price is lesser than to sell price
+            if (stof((*buy_book)[0].price) < stof(order.price)) { // buy price is lesser than to sell price
                 timestamp = getCurrentTimestamp();
                 this->insertTradeHeap(order, "New", order.order_flow, timestamp);
             } else {
@@ -462,7 +474,7 @@ private:
                     if (buy_book->size() == 0) { // there are nothing to buy
                         break;
                     }
-                    if ((*buy_book)[0].price < order.price) { // buy price is lesser than to sell price
+                    if (stof((*buy_book)[0].price) < stof(order.price)) { // buy price is lesser than to sell price
                         break;
                     }
                     int buy_quantity = stoi((*buy_book)[0].quantity);
@@ -477,11 +489,11 @@ private:
                         (*buy_book)[0].quantity = to_string(sell_quantity); // set the transaction quantity
                         timestamp = getCurrentTimestamp();
                         this->insertTradeHeap(order, "Fill", order.order_flow, timestamp);
-                        order.order_flow = to_string(stof(order.order_flow) + incrementor); // increment the order flow number for next row of the same order
+                        order.order_flow = order.order_flow + incrementor; // increment the order flow number for next row of the same order
                         order.quantity = "0"; // set the quantity to zero in order, order completed
                         timestamp = getCurrentTimestamp();
                         this->insertTradeHeap((*buy_book)[0], "PFill", order.order_flow, timestamp);
-                        order.order_flow = to_string(stof(order.order_flow) + incrementor); // increment the order flow number for next row of the same order
+                        order.order_flow = order.order_flow + incrementor; // increment the order flow number for next row of the same order
                         (*buy_book)[0].quantity = to_string(buy_quantity - sell_quantity); // remaining quantity adds to the order book
                         break;
 
@@ -489,32 +501,31 @@ private:
                         order.quantity = to_string(buy_quantity); // set the transaction quantity
                         timestamp = getCurrentTimestamp();
                         this->insertTradeHeap(order, "PFill", order.order_flow, timestamp);
-                        order.order_flow = to_string(stof(order.order_flow) + incrementor); // increment the order flow number for next row of the same order
+                        order.order_flow = order.order_flow + incrementor; // increment the order flow number for next row of the same order
                         order.price = row_price; // set the price to the original price for remaining items
                         order.quantity = to_string(sell_quantity - buy_quantity); // remaining quantity adds to the order book
                         timestamp = getCurrentTimestamp();
                         this->insertTradeHeap((*buy_book)[0], "Fill", order.order_flow, timestamp);
-                        order.order_flow = to_string(stof(order.order_flow) + incrementor); // increment the order flow number for next row of the same order
+                        order.order_flow = order.order_flow + incrementor; // increment the order flow number for next row of the same order
                         buy_book->erase(buy_book->begin()); // remove the completed order from the order book
 
                     } else { // buy quantity is equal to sell quantity
                         timestamp = getCurrentTimestamp();
                         this->insertTradeHeap(order, "Fill", order.order_flow, timestamp);
-                        order.order_flow = to_string(stof(order.order_flow) + incrementor); // increment the order flow number for next row of the same order
+                        order.order_flow = order.order_flow + incrementor; // increment the order flow number for next row of the same order
                         timestamp = getCurrentTimestamp();
                         this->insertTradeHeap((*buy_book)[0], "Fill", order.order_flow, timestamp);
-                        order.order_flow = to_string(stof(order.order_flow) + incrementor);
+                        order.order_flow = order.order_flow + incrementor;
                         buy_book->erase(buy_book->begin()); // remove the completed order from the order book
                         order.quantity = "0"; //order completed, quantity is zero
                         break;
                     }
                 }
             }
+            order.order_flow = old_order_flow;
         }
     }
-
 };
-
 
 
 
@@ -522,8 +533,10 @@ private:
 int main() {
 
 //  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-    const string INPUT_FILE_PATH = "./examples/ex7_1.csv";
+    const string INPUT_FILE_PATH = "./examples/ex6.csv";
 //  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+    cout << "Running..." << endl;
 
     // intialize trading process
     Trade trade;
@@ -531,7 +544,6 @@ int main() {
     // read the csv file and store the orders in unordered map flower_fields
     CSV read_file(INPUT_FILE_PATH);
     read_file.readCsv(trade.order_map);
-
 
     // threads for each flower and rejected orders
     const int num_threads = 6;
@@ -551,6 +563,6 @@ int main() {
     // making the final csv file
     CSV write_file("execution_rep.csv");
     write_file.writeToCsv(trade.trade_queue);
-    
+
     return 0;
 }

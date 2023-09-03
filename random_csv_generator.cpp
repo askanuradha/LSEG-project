@@ -18,17 +18,17 @@ int getRandomQuantity(int min, int max) {
 }
 
 int main() {
-    const int numRows = 1000; // Change this to the desired number of rows
+    const int numRows = 100000; // Change this to the desired number of rows
     const std::string instruments[] = {"Rose", "Lavender", "Tulip", "Orchid", "Lotus"};
     const int numInstruments = sizeof(instruments) / sizeof(instruments[0]);
-    const int sides[] = {-1, 0, 1, 2, 3}; // Intentional side errors
+    const int sides[] = {1, 2}; // Intentional side errors
     const int numSides = sizeof(sides) / sizeof(sides[0]);
     const int minQuantity = 10;
     const int maxQuantity = 1000;
-    const int minPrice = -100; // Intentional negative price
+    const int minPrice = 0; // Intentional negative price
     const int maxPrice = 100;
 
-    std::ofstream outputFile("error_data.csv");
+    std::ofstream outputFile("./examples/random_data.csv");
     if (!outputFile.is_open()) {
         std::cerr << "Error opening output file." << std::endl;
         return 1;
@@ -47,7 +47,7 @@ int main() {
     }
 
     outputFile.close();
-    std::cout << "CSV file with errors created successfully." << std::endl;
+    std::cout << "Random CSV file created successfully." << std::endl;
 
     return 0;
 }
