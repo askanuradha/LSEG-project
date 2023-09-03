@@ -279,7 +279,7 @@ private:
             } catch (...) {
                 return 403;
             }
-            if (quantity % 10 != 0 || quantity >= 1000) {
+            if (quantity % 10 != 0 || quantity >= 1000 || quantity <= 10) {
                 return 403;
             }
         }
@@ -521,10 +521,15 @@ private:
 ////////////////////////////////////////////// MAIN FUNCTION /////////////////////////////////////////////////////////////////
 int main() {
 
+//  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    const string INPUT_FILE_PATH = "./examples/ex7_1.csv";
+//  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+    // intialize trading process
     Trade trade;
 
     // read the csv file and store the orders in unordered map flower_fields
-    CSV read_file("./examples/error_data.csv");
+    CSV read_file(INPUT_FILE_PATH);
     read_file.readCsv(trade.order_map);
 
 
