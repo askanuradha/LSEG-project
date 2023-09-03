@@ -524,7 +524,7 @@ int main() {
     Trade trade;
 
     // read the csv file and store the orders in unordered map flower_fields
-    CSV read_file("./examples/random_data.csv");
+    CSV read_file("./examples/error_data.csv");
     read_file.readCsv(trade.order_map);
 
 
