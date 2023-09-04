@@ -290,6 +290,7 @@ private:
             if (field != "1" && field != "2") return 402;
         }
         else if (column_number == 3) { // quantity column
+            if (field.find('.') != string::npos) return 403; // quantity can not be a float number
             try {
                 quantity = stoi(field);
             } catch (...) {
